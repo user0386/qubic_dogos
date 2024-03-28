@@ -1,0 +1,186 @@
+#!/bin/bash
+####################################################################################
+###
+### QUBIC miner
+### os.dog integration:: shatll(@osdog)
+###
+####################################################################################
+
+. /dog/colors
+cd `dirname $0`
+
+#	global variables, don`t change it
+####################################################################################
+#	The file contains the following variables:
+#	MINERNAME API_PORT CUSTOM_URL POOL PASS WALLET TEMPLATE COIN ADDITION
+CFG_FILENAME="miner.cfg"
+. $CFG_FILENAME
+
+
+#	custom package variables
+####################################################################################
+LOG="/dog/log/qubic-cpu.log"
+SETTINGS_FILE="appsettings.json"
+MINER_FILE="qli-Client"
+
+
+function NeedToInstall() {
+	local ver=`apt-cache policy $1 | grep Installed | sed 's/Installed://; s/\s*//'`
+	[[ $ver && $ver != '(none)' ]] && echo 0 || echo 1
+}
+
+if [[ $(NeedToInstall libc6) -eq 1 ]]; then
+	echo -e "> Install libc6"
+	src="deb http://cz.archive.ubuntu.com/ubuntu jammy main"
+	[[ ! `cat /etc/apt/sources.list | grep "$src"` ]] && echo "$src" >> /etc/apt/sources.list
+	apt update
+	apt install libc6 -yqq
+else
+	echo -e "${GREEN}> libc6 already installed${NOCOLOR}"
+fi
+
+if [[ $(NeedToInstall g++-11) -eq 1 ]]; then
+	echo -e "> Install libc6"
+	src="deb http://cz.archive.ubuntu.com/ubuntu jammy main"
+	[[ ! `cat /etc/apt/sources.list | grep "$src"` ]] && echo "$src" >> /etc/apt/sources.list
+	apt update
+	apt install g++-11 -yqq
+else
+	echo -e "${GREEN}> g++-11 already installed${NOCOLOR}"
+fi
+
+OVERWRITE_APPSETTINGS_JSON=true
+URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.8.9-Linux-x64.tar.gz
+ALIAS=`cat /etc/hostname`
+AUTOUPDATEENABLED=false
+CHECKUPDATEENABLED=true
+AMOUNTOFTHREADS=
+HUGEPAGES=1280
+HUGEPAGESBYNPROC=
+# OVERWRITES=   ToDo
+
+#	parse args ADDITION
+set $ADDITION
+while [ -n "$1" ]; do
+	option=$1
+	
+	if [[ $option == 'url_qli' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		URL_QLI=$1
+	elif [[ $option == 'overwrite_appsettings_json' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		OVERWRITE_APPSETTINGS_JSON=$1
+	elif [[ $option == 'alias' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		ALIAS=$1		
+	elif [[ $option == 'autoupdateEnabled' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		AUTOUPDATEENABLED=$1
+	elif [[ $option == 'checkUpdateEnabled' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		CHECKUPDATEENABLED=$1
+	elif [[ $option == 'amountOfThreads' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		AMOUNTOFTHREADS=$1
+	elif [[ $option == 'hugePagesByNproc' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		HUGEPAGESBYNPROC=$1		
+#	elif [[ $option == 'overwrites' ]]; then
+#		shift
+#		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+#		OVERWRITES=$1
+	elif [[ $option == 'hugePages' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		HUGEPAGES=$1		
+	else
+		XLAM+=" $1"
+	fi
+
+	shift
+done
+ 
+
+[[ $POOL ]] && pool=$POOL || pool='https://mine.qubic.li/'
+amountOfThreads=`nproc`
+[[ $AMOUNTOFTHREADS ]] && if [ "$AMOUNTOFTHREADS" -lt 0 ]; then let amountOfThreads=`nproc`+$AMOUNTOFTHREADS; else amountOfThreads=$AMOUNTOFTHREADS; fi
+DL_VERSION=`basename "$URL_QLI"`
+LS_VER=`ls *.tar.gz`
+
+# echo $OVERWRITES >> 2.txt
+# echo $XLAM >> 2.txt
+
+if [[ $DL_VERSION != $LS_VER ]]; then
+	echo "New url Qubic client, need to download"
+	if wget --spider "${URL_QLI}" 2>/dev/null; then
+		:
+	else
+		echo -e "${RED}> Url does not exist, exit${WHITE}" && exit 1
+	fi
+
+	[[ $LS_VER ]] && rm $LS_VER
+	[[ -f $MINER_FILE ]] && rm $MINER_FILE
+	
+	wget $URL_QLI -q -O $DL_VERSION
+	exitcode=$? && [[ $exitcode -ne 0 ]] && echo -e "${RED}> Error occured $exitcode while downloading, exit${WHITE}" && exit 1
+
+	tar -xf $DL_VERSION $MINER_FILE
+	exitcode=$?
+	if [[ $exitcode -ne 0 ]]; then
+		echo -e "${RED}> Error occured while extracting ${GREEN}$DL_VERSION${RED}, exit${WHITE}"
+		rm $DL_VERSION
+		exit 1
+	fi
+
+fi
+
+cpu_json=$(
+  jq -n \
+  --arg baseUrl "$pool" \
+  --argjson amountOfThreads $amountOfThreads \
+  --arg alias "$ALIAS""_CPU" \
+  --argjson checkUpdateEnabled $CHECKUPDATEENABLED \
+  --argjson autoupdateEnabled $AUTOUPDATEENABLED \
+  '{
+    "Settings": {
+	  $baseUrl,
+	  "overwrites": {},
+	  $amountOfThreads, $alias,
+	  $checkUpdateEnabled, $autoupdateEnabled
+    }
+  }'
+)
+
+
+if [[ ${#WALLET} -ge 61 ]]; then
+	cpu_json=`jq ".Settings += {\"accessToken\": \"$WALLET\"}" <<< "$cpu_json"`
+else
+	cpu_json=`jq ".Settings += {\"payoutId\": \"$WALLET\"}" <<< "$cpu_json"`
+fi
+
+if [ -f $SETTINGS_FILE ]; then
+	if [[ $OVERWRITE_APPSETTINGS_JSON == true ]]; then
+		echo "$cpu_json" > $SETTINGS_FILE
+	fi
+else 
+	echo "$cpu_json" > $SETTINGS_FILE
+fi
+
+[[ $HUGEPAGESBYNPROC ]] && let HUGEPAGES=`nproc`*52
+[[ $HUGEPAGES ]] && sysctl -w vm.nr_hugepages=$HUGEPAGES
+
+$LINE
+echo -e "${GREEN}> Starting custom miner with next settings:${WHITE}"
+echo $cpu_json | jq '.'
+
+batch="$PWD/qli-Client $args"
+
+#	unbuffer is needed to keep colors with tee
+unbuffer $batch 2>&1 | tee --append $LOG
