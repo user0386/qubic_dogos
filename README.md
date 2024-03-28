@@ -23,9 +23,9 @@ upgrade && sreboot
 | alias | name/no parameter |
 | autoupdateEnabled | true/false |
 | checkUpdateEnabled | true/false |
+| allowHwInfoCollect | true/false |
 | amountOfThreads | negative numbers/positive numbers/no parameter for all cores |
 | hugePagesByNproc | true |
-| allowHwInfoCollect | true/false |
 | hugePages | numbers |
 
 <br />
