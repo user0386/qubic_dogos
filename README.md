@@ -55,3 +55,16 @@ wget -O /dog/miners/custom/qubic_dogos_gpu/stats https://raw.githubusercontent.c
 ```
 getminer custom -f && miner restart
 ```
+<br />
+<br />
+
+-----------
+
+## Qubic-Solutions rqiner
+```
+{"name":"Qubic Rqiner CPU","coin":"custom","wallet":"QUBIC_WALLET","miner":"custom","addition":"url_miner https://github.com/Qubic-Solutions/rqiner-builds/releases/download/v0.3.17/rqiner-x86\nthreads -1","fork":"latest","custom_url":"https://github.com/user0386/qubic_dogos/raw/main/rqiner_dogos.tar.gz"}
+```
+to select the desired version, visit  https://github.com/Qubic-Solutions/rqiner-builds/releases 
+
+<br />
+<br />
