@@ -36,7 +36,8 @@ LOG="/dog/log/qubic-cpu.log"
 
 algo="qubic_CPU"
 miner="qli-Client_CPU"
-ver=`$baseDir/qli-Client --version | sed 's/Client Version //'`
+minername="qli-Client"
+ver=`$baseDir/$minername --version | sed 's/Client Version //'`
 [[ ! $ver ]] && ver='unknown'
 
 data=$(
@@ -49,7 +50,28 @@ data=$(
 		}'
 )
 
-minername="qli-Client"
+get_cpu_temp () {
+	for HWMON in $(ls /sys/class/hwmon); do
+		[[ -f /sys/class/hwmon/${HWMON}/name ]] &&
+			local test=$(cat /sys/class/hwmon/${HWMON}/name | grep -c -E 'coretemp|k10temp|k8temp')
+		if [[ $test -gt 0 ]]; then
+			HWMON_DIR=/sys/class/hwmon/$HWMON
+			break
+		fi
+	done
+	local inputs=()
+	local temp=
+	[[ ! -z $HWMON_DIR ]] && readarray -t inputs < <(ls $HWMON_DIR/temp*_input | sort -V)
+	[[ ${#inputs[@]} -eq 0 ]] && echo "null" && return 1
+	local input=
+	[[ -z "$1" ]] && input=0
+	[[ "$1" =~ ^[0-9]+$ ]] && input=$1
+	[[ ! -z $input && ! -z ${inputs[input]} ]] && temp=`awk '{ printf("%.0f\n", $1/1000)}' ${inputs[input]} 2>/dev/null`
+	echo "${temp:-null}"
+}
+cpu_temp=$(get_cpu_temp)
+
+
 online_raw=`ps -C $minername -o etimes,cmd= | awk '/cpu/{print $1}'`
 if [[ ! -z $online_raw ]]; then
   online=$(date --date "-$online_raw sec" +%s) #absolute time
@@ -85,9 +107,9 @@ sol=`echo $allStatstr | awk '/SOL:/ {print $7}'`
 #[[ $epoch ]] && ver="$ver|E${epoch} |SOL ${sol}"
 data=`jq ". += {\"ver\": \"$ver\"}" <<< "$data"`
 
-cpuTempIntel=(`sensors -u *-isa-* 2>/dev/null | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
-cpuTempAMD=(`sensors -u k10temp-pci-* 2>/dev/null | grep "temp[0-9]_input" | sed "s/.*_input: //"`)
-cpu_temp=(`echo ${cpuTempIntel[@]} ${cpuTempAMD[@]}`)
+#cpuTempIntel=(`sensors -u *-isa-* 2>/dev/null | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
+#cpuTempAMD=(`sensors -u k10temp-pci-* 2>/dev/null | grep "temp[0-9]_input" | sed "s/.*_input: //"`)
+#cpu_temp=(`echo ${cpuTempIntel[@]} ${cpuTempAMD[@]}`)
 
 cpuFanRPMIntel=(`sensors -u *-isa-* 2>/dev/null | grep fan -A1 | grep _input | sed 's/.*_input: //'`)
 for v in ${cpuFanRPMIntel[@]}; do
