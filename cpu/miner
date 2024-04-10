@@ -50,12 +50,12 @@ else
 fi
 
 OVERWRITE_APPSETTINGS_JSON=true
-URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.8.9-Linux-x64.tar.gz
+URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.8.10-Linux-x64.tar.gz
 ALIAS=`cat /etc/hostname`
 AUTOUPDATEENABLED=false
 CHECKUPDATEENABLED=true
 AMOUNTOFTHREADS=
-HUGEPAGES=1280
+HUGEPAGES=
 HUGEPAGESBYNPROC=
 # OVERWRITES=   ToDo
 
@@ -173,14 +173,14 @@ else
 	echo "$cpu_json" > $SETTINGS_FILE
 fi
 
-[[ $HUGEPAGESBYNPROC ]] && let HUGEPAGES=`nproc`*52
+[[ $HUGEPAGESBYNPROC ]] && let HUGEPAGES=`nproc`*95
 [[ $HUGEPAGES ]] && sysctl -w vm.nr_hugepages=$HUGEPAGES
 
 $LINE
 echo -e "${GREEN}> Starting custom miner with next settings:${WHITE}"
 echo $cpu_json | jq '.'
 
-batch="$PWD/qli-Client $args"
+batch="$PWD/$MINER_FILE $args"
 
 #	unbuffer is needed to keep colors with tee
 unbuffer $batch 2>&1 | tee --append $LOG
