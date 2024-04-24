@@ -50,11 +50,10 @@ else
 fi
 
 
-URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.8.9-Linux-x64.tar.gz
+URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.9.5-Linux-x64.tar.gz
 ALIAS=`cat /etc/hostname`
 AUTOUPDATEENABLED=false
 CHECKUPDATEENABLED=true
-ALLOWHWINFOCOLLECT=false
 # OVERWRITES=   ToDo
 
 #	parse args ADDITION
@@ -78,10 +77,6 @@ while [ -n "$1" ]; do
 		shift
 		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
 		CHECKUPDATEENABLED=$1
-	elif [[ $option == 'allowHwInfoCollect' ]]; then
-		shift
-		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
-		ALLOWHWINFOCOLLECT=$1
 #	elif [[ $option == 'overwrites' ]]; then
 #		shift
 #		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
@@ -130,12 +125,12 @@ gpu_json=$(
   --arg alias "$ALIAS""_GPU" \
   --argjson checkUpdateEnabled $CHECKUPDATEENABLED \
   --argjson autoupdateEnabled $AUTOUPDATEENABLED \
-  --argjson allowHwInfoCollect $ALLOWHWINFOCOLLECT \
   '{
     "Settings": {
 	  $baseUrl, $alias,
-	  "overwrites": {"CUDA": "12"},
-	  $allowHwInfoCollect, $checkUpdateEnabled, $autoupdateEnabled
+	  "amountOfThreads": 0,
+	  "trainer": {"gpu": true,"gpuVersion": "CUDA12","cpu": false},
+	  $checkUpdateEnabled, $autoupdateEnabled
     }
   }'
 )
@@ -160,7 +155,7 @@ $LINE
 echo -e "${GREEN}> Starting custom miner with next settings:${WHITE}"
 echo $gpu_json | jq '.'
 
-batch="$PWD/qli-Client $args"
+batch="$PWD/$MINER_FILE $args"
 
 #	unbuffer is needed to keep colors with tee
 unbuffer $batch 2>&1 | tee --append $LOG

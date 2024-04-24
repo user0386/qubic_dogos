@@ -50,10 +50,11 @@ else
 fi
 
 OVERWRITE_APPSETTINGS_JSON=true
-URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.8.10-Linux-x64.tar.gz
+URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.9.5-Linux-x64.tar.gz
 ALIAS=`cat /etc/hostname`
 AUTOUPDATEENABLED=false
 CHECKUPDATEENABLED=true
+ALLOWHWINFOCOLLECT=false
 AMOUNTOFTHREADS=
 HUGEPAGES=
 HUGEPAGESBYNPROC=
@@ -84,6 +85,10 @@ while [ -n "$1" ]; do
 		shift
 		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
 		CHECKUPDATEENABLED=$1
+	elif [[ $option == 'allowHwInfoCollect' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		ALLOWHWINFOCOLLECT=$1
 	elif [[ $option == 'amountOfThreads' ]]; then
 		shift
 		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
@@ -148,12 +153,13 @@ cpu_json=$(
   --arg alias "$ALIAS""_CPU" \
   --argjson checkUpdateEnabled $CHECKUPDATEENABLED \
   --argjson autoupdateEnabled $AUTOUPDATEENABLED \
+  --argjson allowHwInfoCollect $ALLOWHWINFOCOLLECT \
   '{
     "Settings": {
 	  $baseUrl,
 	  "overwrites": {},
 	  $amountOfThreads, $alias,
-	  $checkUpdateEnabled, $autoupdateEnabled
+	  $allowHwInfoCollect, $checkUpdateEnabled, $autoupdateEnabled
     }
   }'
 )
