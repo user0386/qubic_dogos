@@ -100,9 +100,10 @@ if [[ ! -z $totalSolutions ]]; then
   data=`jq ". += {\"total_share\": $totalSolutions}" <<< "$data"`
 fi
 
-cpu_version=$(tail -n -1500 "$LOG" | grep -aoP 'Trainer: cpu version \K\d+\.\d+' | tail -n 1)
+cpu_version=$(grep -aoP 'Trainer: cpu version \K\d+\.\d+' "$LOG" | tail -n 1)
 sol=`echo $allStatstr | awk '/SOL:/ {print $7}'`
-[[ $cpu_version ]] && ver="$ver E${cpu_version} SOL:${sol}"
+[[ $cpu_version ]] && ver="$ver E${cpu_version}"
+[[ $sol ]] && ver="$ver SOL:${sol}"
 #epoch=`echo $allStatstr | sed -e 's/.*E://; s# .*##'`
 #[[ $epoch ]] && ver="$ver|E${epoch} |SOL ${sol}"
 data=`jq ". += {\"ver\": \"$ver\"}" <<< "$data"`

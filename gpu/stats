@@ -36,7 +36,8 @@ LOG="/dog/log/qubic-gpu.log"
 
 algo="qubic_GPU"
 miner="qli-Client_GPU"
-ver=`$baseDir/qli-Client --version | sed 's/Client Version //'`
+minername="qli-Client"
+ver=`$baseDir/$minername --version | sed 's/Client Version //'`
 [[ ! $ver ]] && ver='unknown'
 
 data=$(
@@ -48,7 +49,7 @@ data=$(
 			$algo
 		}'
 )
-minername="qli-Client"
+
 online_raw=`ps -C $minername -o etimes,cmd= | awk '/gpu/{print $1}'`
 if [[ ! -z $online_raw ]]; then
   online=$(date --date "-$online_raw sec" +%s) #absolute time
@@ -91,9 +92,10 @@ if [[ ! -z $totalSolutions ]]; then
   data=`jq ". += {\"total_share\": $totalSolutions}" <<< "$data"`
 fi
 
-gpu_version=$(tail -n -1000 "$LOG" | grep -aoP 'Trainer: cuda version \K\d+\.\d+' | tail -n -1)
+gpu_version=$(grep -aoP 'Trainer: cuda version \K\d+\.\d+' "$LOG" | tail -n -1)
 sol=`echo $allStatstr | awk '/SOL:/ {print $7}'`
-[[ $gpu_version ]] && ver="$ver E${gpu_version} SOL:${sol}"
+[[ $gpu_version ]] && ver="$ver E${gpu_version}"
+[[ $sol ]] && ver="$ver SOL:${sol}"
 #epoch=`echo $allStatstr | sed -e 's/.*E://; s# .*##'`
 #[[ $epoch ]] && ver="$ver|E${epoch}"
 data=`jq ". += {\"ver\": \"$ver\"}" <<< "$data"`
