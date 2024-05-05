@@ -1,27 +1,28 @@
 #!/bin/bash
 ####################################################################################
 ###
-### QUBIC miner
-### os.dog integration:: shatll(@osdog)
-###
-####################################################################################
-
-. /dog/colors
-cd `dirname $0`
+### QUBIC miner qubic-li  qubic.li
 
 #	global variables, don`t change it
 ####################################################################################
 #	The file contains the following variables:
 #	MINERNAME API_PORT CUSTOM_URL POOL PASS WALLET TEMPLATE COIN ADDITION
+. /dog/colors
+cd `dirname $0`
 CFG_FILENAME="miner.cfg"
 . $CFG_FILENAME
-
 
 #	custom package variables
 ####################################################################################
 LOG="/dog/log/qubic-cpu.log"
 SETTINGS_FILE="appsettings.json"
 MINER_FILE="qli-Client"
+
+
+
+PROFILE=`cat /run/dog/profiles/profile$(pstree --show-parents -l -a -p $$ | sed -n 's/.*-dmS miner\([0-9]*\)\..*/\1/p')`
+ADDITION=$(echo $PROFILE | jq -r '.addition')
+
 
 
 function NeedToInstall() {
@@ -49,18 +50,24 @@ else
 	echo -e "${GREEN}> g++-11 already installed${NOCOLOR}"
 fi
 
+
+#echo `pstree --show-parents -l -a -p $$ | sed -n 's/.*-dmS miner\([0-9]*\)\..*/\1/p'`
+#read -rsn1 -p"Press any key to continue"
+
 OVERWRITE_APPSETTINGS_JSON=true
 URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.9.5-Linux-x64.tar.gz
 ALIAS=`cat /etc/hostname`
 AUTOUPDATEENABLED=false
 CHECKUPDATEENABLED=true
-ALLOWHWINFOCOLLECT=false
+ALLOWHWINFOCOLLECT=true
 AMOUNTOFTHREADS=
 HUGEPAGES=
+HUGEPAGES_RATIO=104
 HUGEPAGESBYNPROC=
-# OVERWRITES=   ToDo
+#conservative ondemand userspace powersave performance schedutil
+SCALING_GOVERNOR=
 
-#	parse args ADDITION
+
 set $ADDITION
 while [ -n "$1" ]; do
 	option=$1
@@ -96,31 +103,54 @@ while [ -n "$1" ]; do
 	elif [[ $option == 'hugePagesByNproc' ]]; then
 		shift
 		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
-		HUGEPAGESBYNPROC=$1		
-#	elif [[ $option == 'overwrites' ]]; then
-#		shift
-#		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
-#		OVERWRITES=$1
+		HUGEPAGESBYNPROC=$1
+	elif [[ $option == 'hugePages_ratio' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		HUGEPAGES_RATIO=$1		
 	elif [[ $option == 'hugePages' ]]; then
 		shift
 		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
 		HUGEPAGES=$1		
+	elif [[ $option == 'scaling_governor' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		SCALING_GOVERNOR=$1
 	else
 		XLAM+=" $1"
 	fi
 
 	shift
 done
- 
+
+
+cpu_json=$(jq -r <<< "$XLAM")
+ret=$?
+if [ $ret -ne 0 ]; then
+        echo "addition | json | ${RED}parse error, exit${WHITE}" && exit 1
+fi
+[[ $cpu_json ]] || cpu_json=$(jq -n '{"Settings": {"trainer": {"cpu": true, "gpu": false}}}')
 
 [[ $POOL ]] && pool=$POOL || pool='https://mine.qubic.li/'
-amountOfThreads=`nproc`
+amountOfThreads=$(nproc)
 [[ $AMOUNTOFTHREADS ]] && if [ "$AMOUNTOFTHREADS" -lt 0 ]; then let amountOfThreads=`nproc`+$AMOUNTOFTHREADS; else amountOfThreads=$AMOUNTOFTHREADS; fi
-DL_VERSION=`basename "$URL_QLI"`
-LS_VER=`ls *.tar.gz`
 
-# echo $OVERWRITES >> 2.txt
-# echo $XLAM >> 2.txt
+cpu_json=$(jq --argjson amountOfThreads $amountOfThreads '.Settings.trainer.cpuThreads= $amountOfThreads'	<<< $cpu_json)
+#cpu_json=$(jq '.Settings.trainer.cpu= true'	<<< $cpu_json)
+#cpu_json=$(jq '.Settings.trainer.gpu= false'	<<< $cpu_json)
+cpu_json=$(jq --arg alias "$ALIAS""_CPU" '.Settings.alias= $alias'	<<< $cpu_json)
+cpu_json=$(jq --arg baseUrl "$pool" '.Settings.baseUrl= $baseUrl'	<<< $cpu_json)
+
+[[ $AUTOUPDATEENABLED  ]] && cpu_json=$(jq --argjson checkUpdateEnabled $CHECKUPDATEENABLED '.Settings.checkUpdateEnabled= $checkUpdateEnabled'	<<< $cpu_json)
+[[ $CHECKUPDATEENABLED ]] && cpu_json=$(jq --argjson autoupdateEnabled $AUTOUPDATEENABLED '.Settings.autoupdateEnabled= $autoupdateEnabled'	<<< $cpu_json)
+[[ $ALLOWHWINFOCOLLECT ]] && cpu_json=$(jq --argjson allowHwInfoCollect $ALLOWHWINFOCOLLECT '.Settings.allowHwInfoCollect= $allowHwInfoCollect'	<<< $cpu_json)
+
+if [[ ${#WALLET} -ge 61 ]]; then
+	cpu_json=$(jq --arg wallet $WALLET '.Settings.accessToken= $wallet'	<<< $cpu_json)
+else
+	cpu_json=$(jq --arg wallet $WALLET '.Settings.payoutId= $wallet'	<<< $cpu_json)
+fi
+
 
 if [[ $DL_VERSION != $LS_VER ]]; then
 	echo "New url Qubic client, need to download"
@@ -146,30 +176,6 @@ if [[ $DL_VERSION != $LS_VER ]]; then
 
 fi
 
-cpu_json=$(
-  jq -n \
-  --arg baseUrl "$pool" \
-  --argjson amountOfThreads $amountOfThreads \
-  --arg alias "$ALIAS""_CPU" \
-  --argjson checkUpdateEnabled $CHECKUPDATEENABLED \
-  --argjson autoupdateEnabled $AUTOUPDATEENABLED \
-  --argjson allowHwInfoCollect $ALLOWHWINFOCOLLECT \
-  '{
-    "Settings": {
-	  $baseUrl,
-	  "overwrites": {},
-	  $amountOfThreads, $alias,
-	  $allowHwInfoCollect, $checkUpdateEnabled, $autoupdateEnabled
-    }
-  }'
-)
-
-
-if [[ ${#WALLET} -ge 61 ]]; then
-	cpu_json=`jq ".Settings += {\"accessToken\": \"$WALLET\"}" <<< "$cpu_json"`
-else
-	cpu_json=`jq ".Settings += {\"payoutId\": \"$WALLET\"}" <<< "$cpu_json"`
-fi
 
 if [ -f $SETTINGS_FILE ]; then
 	if [[ $OVERWRITE_APPSETTINGS_JSON == true ]]; then
@@ -179,8 +185,9 @@ else
 	echo "$cpu_json" > $SETTINGS_FILE
 fi
 
-[[ $HUGEPAGESBYNPROC ]] && let HUGEPAGES=`nproc`*95
+[[ $HUGEPAGESBYNPROC ]] && let HUGEPAGES=`nproc`*$HUGEPAGES_RATIO
 [[ $HUGEPAGES ]] && sysctl -w vm.nr_hugepages=$HUGEPAGES
+[[ $SCALING_GOVERNOR ]] && sudo echo $SCALING_GOVERNOR | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 
 $LINE
 echo -e "${GREEN}> Starting custom miner with next settings:${WHITE}"
