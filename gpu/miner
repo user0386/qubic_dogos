@@ -1,27 +1,26 @@
 #!/bin/bash
 ####################################################################################
 ###
-### QUBIC miner
-### os.dog integration:: shatll(@osdog)
-###
-####################################################################################
-
-. /dog/colors
-cd `dirname $0`
+### QUBIC miner qubic-li  qubic.li
 
 #	global variables, don`t change it
 ####################################################################################
 #	The file contains the following variables:
 #	MINERNAME API_PORT CUSTOM_URL POOL PASS WALLET TEMPLATE COIN ADDITION
+. /dog/colors
+cd `dirname $0`
 CFG_FILENAME="miner.cfg"
 . $CFG_FILENAME
-
 
 #	custom package variables
 ####################################################################################
 LOG="/dog/log/qubic-gpu.log" 
 SETTINGS_FILE="appsettings.json"
 MINER_FILE="qli-Client"
+
+
+PROFILE=`cat /run/dog/profiles/profile$(pstree --show-parents -l -a -p $$ | sed -n 's/.*-dmS miner\([0-9]*\)\..*/\1/p')`
+ADDITION=$(echo $PROFILE | jq -r '.addition')
 
 
 function NeedToInstall() {
@@ -50,11 +49,15 @@ else
 fi
 
 
+#echo `pstree --show-parents -l -a -p $$ | sed -n 's/.*-dmS miner\([0-9]*\)\..*/\1/p'`
+#read -rsn1 -p"Press any key to continue"
+
+OVERWRITE_APPSETTINGS_JSON=true
 URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.9.5-Linux-x64.tar.gz
 ALIAS=`cat /etc/hostname`
 AUTOUPDATEENABLED=false
 CHECKUPDATEENABLED=true
-# OVERWRITES=   ToDo
+
 
 #	parse args ADDITION
 set $ADDITION
@@ -77,10 +80,6 @@ while [ -n "$1" ]; do
 		shift
 		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
 		CHECKUPDATEENABLED=$1
-#	elif [[ $option == 'overwrites' ]]; then
-#		shift
-#		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
-#		OVERWRITES=$1	
 	else
 		XLAM+=" $1"
 	fi
@@ -88,12 +87,29 @@ while [ -n "$1" ]; do
 	shift
 done
 
+gpu_json=$(jq -r <<< "$XLAM")
+ret=$?
+if [ $ret -ne 0 ]; then
+        echo "addition | json | ${RED}parse error, exit${WHITE}" && exit 1
+fi
+[[ $gpu_json ]] || gpu_json=$(jq -n '{"Settings": {"trainer": {"cpu": false, "gpu": true, "gpuVersion": "CUDA12"}}}')
+
 [[ $POOL ]] && pool=$POOL || pool='https://mine.qubic.li/'
+gpu_json=$(jq --arg alias "$ALIAS""_GPU" '.Settings.alias= $alias'	<<< $gpu_json)
+gpu_json=$(jq --arg baseUrl "$pool" '.Settings.baseUrl= $baseUrl'	<<< $gpu_json)
+
+[[ $AUTOUPDATEENABLED  ]] && gpu_json=$(jq --argjson checkUpdateEnabled $CHECKUPDATEENABLED '.Settings.checkUpdateEnabled= $checkUpdateEnabled'	<<< $gpu_json)
+[[ $CHECKUPDATEENABLED ]] && gpu_json=$(jq --argjson autoupdateEnabled $AUTOUPDATEENABLED '.Settings.autoupdateEnabled= $autoupdateEnabled'	<<< $gpu_json)
+
+if [[ ${#WALLET} -ge 61 ]]; then
+	gpu_json=$(jq --arg wallet $WALLET '.Settings.accessToken= $wallet'	<<< $gpu_json)
+else
+	gpu_json=$(jq --arg wallet $WALLET '.Settings.payoutId= $wallet'	<<< $gpu_json)
+fi
+
+
 DL_VERSION=`basename "$URL_QLI"`
 LS_VER=`ls *.tar.gz`
-
-# echo $OVERWRITES >> 2.txt
-# echo $XLAM >> 2.txt
 
 if [[ $DL_VERSION != $LS_VER ]]; then
 	echo "New url Qubic client, need to download"
@@ -119,28 +135,6 @@ if [[ $DL_VERSION != $LS_VER ]]; then
 
 fi
 
-gpu_json=$(
-  jq -n \
-  --arg baseUrl "$pool" \
-  --arg alias "$ALIAS""_GPU" \
-  --argjson checkUpdateEnabled $CHECKUPDATEENABLED \
-  --argjson autoupdateEnabled $AUTOUPDATEENABLED \
-  '{
-    "Settings": {
-	  $baseUrl, $alias,
-	  "amountOfThreads": 0,
-	  "trainer": {"gpu": true,"gpuVersion": "CUDA12","cpu": false},
-	  $checkUpdateEnabled, $autoupdateEnabled
-    }
-  }'
-)
-
-
-if [[ ${#WALLET} -ge 61 ]]; then
-  gpu_json=`jq ".Settings += {\"accessToken\": \"$WALLET\"}" <<< "$gpu_json"`  
-else
-  gpu_json=`jq ".Settings += {\"payoutId\": \"$WALLET\"}" <<< "$gpu_json"`  
-fi
 
 if [ -f $SETTINGS_FILE ]; then
 	if [[ $OVERWRITE_APPSETTINGS_JSON == true ]]; then

@@ -151,6 +151,8 @@ else
 	cpu_json=$(jq --arg wallet $WALLET '.Settings.payoutId= $wallet'	<<< $cpu_json)
 fi
 
+DL_VERSION=`basename "$URL_QLI"`
+LS_VER=`ls *.tar.gz`
 
 if [[ $DL_VERSION != $LS_VER ]]; then
 	echo "New url Qubic client, need to download"
