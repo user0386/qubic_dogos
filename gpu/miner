@@ -55,8 +55,8 @@ fi
 OVERWRITE_APPSETTINGS_JSON=true
 URL_QLI=https://dl.qubic.li/downloads/qli-Client-1.9.5-Linux-x64.tar.gz
 ALIAS=`cat /etc/hostname`
-AUTOUPDATEENABLED=false
-CHECKUPDATEENABLED=true
+AUTOUPDATEENABLED=
+CHECKUPDATEENABLED=
 
 
 #	parse args ADDITION
