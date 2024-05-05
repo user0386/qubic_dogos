@@ -57,6 +57,8 @@ wget -O /dog/miners/custom/qubic_dogos_gpu/stats https://raw.githubusercontent.c
 getminer custom -f && miner restart
 ```
 <br />
+to select the desired version and config, visit https://github.com/qubic-li/client
+<br />
 <br />
 
 -----------
