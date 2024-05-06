@@ -35,7 +35,7 @@ if [[ $(NeedToInstall libc6) -eq 1 ]]; then
 	apt update
 	apt install libc6 -yqq
 else
-	echo -e "${GREEN}> libc6 already installed${NOCOLOR}"
+	echo -e "${GREEN}> libc6 already installed${WHITE}${NOCOLOR}"
 fi
 
 if [[ $(NeedToInstall g++-11) -eq 1 ]]; then
@@ -45,7 +45,7 @@ if [[ $(NeedToInstall g++-11) -eq 1 ]]; then
 	apt update
 	apt install g++-11 -yqq
 else
-	echo -e "${GREEN}> g++-11 already installed${NOCOLOR}"
+	echo -e "${GREEN}> g++-11 already installed${WHITE}${NOCOLOR}"
 fi
 
 
@@ -90,7 +90,7 @@ done
 gpu_json=$(jq -r <<< "$XLAM")
 ret=$?
 if [ $ret -ne 0 ]; then
-        echo "addition | json | ${RED}parse error, exit${WHITE}" && exit 1
+        echo -e "addition | json | ${RED}parse error, exit${WHITE}" && exit 1
 fi
 [[ $gpu_json ]] || gpu_json=$(jq -n '{"Settings": {"trainer": {"cpu": false, "gpu": true, "gpuVersion": "CUDA12"}}}')
 
